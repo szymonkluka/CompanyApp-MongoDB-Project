@@ -1,70 +1,96 @@
 const express = require('express');
 const router = express.Router();
-const db = require('./../db');
-const ObjectId = require('mongodb').ObjectId
+const Employee = require('../models/employees.model');
 
-router.get('/employees', (req, res) => {
-  req.db.collection('employees').find().toArray((err, data) => {
-    if (err) res.status(500).json({ message: err })
-    else (res.json(data))
-  });
-});
-
-router.get('/employees/random', (req, res) => {
-  req.db.collection('employees').aggregate([{ $sample: { size: 1 } }]).toArray((err, data) => {
-    if (err) res.status(500).json({ message: err });
-    else res.json(data[0]);
-  })
-});
-
-
-router.get('/employees/:id', (req, res) => {
+router.get('/employees', async (req, res) => {
   try {
-    const objectId = new ObjectId(req.params.id);
-    req.db.collection('employees').findOne({ _id: objectId }, (err, data) => {
-      if (err) {
-        return res.status(500).json({ message: err });
-      }
-      if (!data) {
-        return res.status(404).json({ message: 'NotFound' });
-      }
-      res.json(data);
-    });
-  } catch (error) {
-    res.status(404).json({ message: 'NotFound' });
+    res.json(await Employee.find());
+  }
+  catch (err) {
+    res.status(500).json({ message: err })
   }
 });
 
-router.post('/employees', (req, res) => {
-  const { firstName, lastName, department } = req.body;
-  req.db.collection('employees').insertOne({ firstName: firstName, lastName: lastName, department: department }, err => {
-    if (err) res.status(500).json({ message: err })
-    else res.json({ message: 'OK' })
-  })
+router.get('/employees/random', async (req, res) => {
+
+  try {
+    const count = await Employee.countDocuments();
+    const rand = Math.floor(Math.random() * count);
+    const dep = await Employee.findOne().skip(rand);
+    if (!dep) res.status(404).json({ message: 'Not found' });
+    else res.json(dep);
+  }
+  catch (err) {
+    res.status(500).json({ message: err });
+  }
+
+});
+
+router.get('/employees/:id', async (req, res) => {
+
+  try {
+    const dep = await Employee.findById(req.params.id);
+    if (!dep) res.status(404).json({ message: 'Not found' });
+    else res.json(dep);
+  }
+  catch (err) {
+    res.status(500).json({ message: err });
+  }
+
+});
+
+router.post('/employees', async (req, res) => {
+  try {
+    const { firstName, lastName, department } = req.body;
+    const newEmployee = new Employee({
+      firstName: firstName,
+      lastName: lastName,
+      department: department
+    });
+    await newEmployee.save();
+    res.json({ message: 'OK' });
+  } catch (err) {
+    res.status(500).json({ message: err });
+  }
 });
 
 router.put('/employees/:id', async (req, res) => {
   const { firstName, lastName, department } = req.body;
+
   try {
-    const objectId = new ObjectId(req.params.id);
-    await req.db.collection('employees').updateOne({ _id: objectId }, { $set: { firstName, lastName, department } });
-    res.json({ message: 'OK' });
-  } catch (error) {
-    res.status(404).json({ message: 'Not found' });
+    const dep = await Employee.findById(req.params.id);
+    if (dep) {
+      await Employee.updateOne({ _id: req.params.id }, {
+        $set: {
+          firstName: firstName,
+          lastName: lastName,
+          department: department
+        }
+      });
+      res.json({ message: 'OK' });
+    }
+    else res.status(404).json({ message: 'Not found...' });
   }
+  catch (err) {
+    res.status(500).json({ message: err });
+  }
+
 });
 
 router.delete('/employees/:id', async (req, res) => {
+
   try {
-    const objectId = new ObjectId(req.params.id);
-    const result = await req.db.collection('employees').deleteOne({ _id: objectId });
-    if (result.deletedCount === 0) {
-      return res.status(404).json({ message: 'Not found' });
+    const dep = await Employee.findById(req.params.id);
+    if (dep) {
+      await Employee.deleteOne({ _id: req.params.id });
+      res.json({ message: 'OK' });
     }
-    res.json({ message: 'OK' });
-  } catch (error) {
-    res.status(404).json({ message: 'Not found' });
+    else res.status(404).json({ message: 'Not found...' });
   }
+  catch (err) {
+    res.status(500).json({ message: err });
+  }
+
 });
 
 
